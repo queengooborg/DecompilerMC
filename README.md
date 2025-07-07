@@ -44,7 +44,8 @@ Examples:
 
 
 ```bash
-usage: main.py [-h] [--interactive INTERACTIVE] [--side {client,server}] [--clean] [--force] [--decompiler {fernflower,cfr}] [--quiet] mcversion
+usage: main.py [-h] [--interactive INTERACTIVE] [--side {client,server}] [--clean] [--force] [--decompiler {fernflower,cfr}] [--quiet]
+               [mcversion]
 
 Decompile Minecraft source code
 
@@ -54,13 +55,13 @@ positional arguments:
 
 options:
   -h, --help            show this help message and exit
-  --interactive INTERACTIVE, -i INTERACTIVE
+  --interactive, -i INTERACTIVE
                         Enable an interactive CLI to specify options (all other command line arguments, besides --quiet, will be ignored)
-  --side {client,server}, -s {client,server}
+  --side, -s {client,server}
                         Whether to decompile the client side or server side
   --clean, -c           Clean old runs
   --force, -f           Force resolving conflicts by replacing old files
-  --decompiler {fernflower,cfr}, -d {fernflower,cfr}
+  --decompiler, -d {fernflower,cfr}
                         Select a copmiler to run
   --quiet, -q           Suppresses logging output
 ```
