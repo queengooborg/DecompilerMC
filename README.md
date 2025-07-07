@@ -1,47 +1,23 @@
 # DecompilerMC
 
----
-**What is this for?**
+This tool automatically decompiles and remaps specific Minecraft versions. (Specifically, it converts Mojang's mappings from their proguard format to the tsrg format. SpecialSource then uses that and remaps the client jar, which is then decompiled either with CFR (code only) or Fernflower (assets and code).)
 
-This tool will help you convert mappings from mojang from their proguard format to the tsrg format that then can be used directly with specialsource which will then remap the client jar. Once that done it can be decompiled either with cfr (code only) or fernflower (assets and code).
+Your output will be readable/executable code similar to ModCoderPack or other decompilers.
 
-Of course we provide all that toolchain directly so your output will be readable (and soon executable) code as you could get with MCP (ModCoderPack)
+## Prerequisites
 
----
-**Important Note**
+You will need
+- an Internet connection to download the mappings. You can obviously put them in the respective folder if you have them physically.
+- Windows, MacOS, or Linux.
+- A Java runtime inside your path (Java 8 should be good).
 
-You need an internet connection to download the mappings, you can ofc put them in the respective folder if you have them physically
+You can run this directly with Python 3.7+ with `python3 main.py`. CFR decompilation takes approximately 60s and fernflower takes roughly 200s. The code will then be inside the folder called `./src/<name_version(option_hash)>/<side>`; you can find the jar and the version manifest in the `./versions/` directory.
 
-We support Windows, MacOS and linux
+The `./tmp/` directory can be removed without impact.
 
-You need a java runtime inside your path (Java 8 should be good)
-
-CFR decompilation is approximately 60s and fernflower takes roughly 200s, please give it time
-
-You can run it directly with python 3.7+ with `python3 main.py`
-
-You can find the jar and the version manifest in the `./versions/` directory
-
-The code will then be inside the folder called `./src/<name_version(option_hash)>/<side>`
-
-The `./tmp/` directory can be removed without impact
-
-There is a common release here:  https://github.com/hube12/DecompilerMC/releases/latest for all version
+There is a common release here: https://github.com/hube12/DecompilerMC/releases/latest for all versions.
 
 ----
-
-You can use arguments instead of terminal based choice, this is not required but once you pass a mcversion it will start the process
-
-We recommend using -q everytime otherwise it might ask stdin questions.
-
-By default we employ the nice guy strategy which is if the folder exist we create a new random one, please consider using -f, 
-if you actually need a specific path.
-
-Examples:
-- Decompile latest release without any output: `python3 main.py latest -q` 
-- Decompile latest snapshot server side with output: `python3 main.py snap --side server` 
-- Decompile 1.14.4 client side with output cleaning any old runs:  `python3 main.py 1.14.4 -s client -f -q -c` 
-
 
 ```bash
 usage: main.py [-h] [--interactive INTERACTIVE] [--side {client,server}] [--clean] [--force] [--decompiler {fernflower,cfr}] [--quiet]
@@ -66,10 +42,14 @@ options:
   --quiet, -q           Suppresses logging output
 ```
 
+Examples:
+- Decompile latest release without any output: `python3 main.py --mcv latest -q` 
+- Decompile latest snapshot server side with output: `python3 main.py snap --side server` 
+- Decompile 1.14.4 client side with output, cleaning up old runs:  `python3 main.py 1.14.4 -s client -f -q -c` 
+
 ----
 
-Build command (for executable):
-
+To build as an executable, the commands are
 ```python
 pip install pyinstaller
 pyinstaller main.py --distpath build --onefile

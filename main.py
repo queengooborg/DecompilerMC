@@ -2,6 +2,7 @@
 import argparse
 import datetime
 import glob
+import hashlib
 import json
 import os
 import random
@@ -16,10 +17,10 @@ from os.path import join, split
 from pathlib import Path
 from shutil import which
 from subprocess import CalledProcessError
-from typing import Union
+from typing import Literal, TypeAlias, Union
 from urllib.error import HTTPError, URLError
 
-assert sys.version_info >= (3, 7)
+if sys.version_info < (3, 7): raise OSError("Python verson must be 3.7 or above.")
 
 SPECIAL_SOURCE_VERSION = "1.11.4"
 MANIFEST_LOCATION = "https://piston-meta.mojang.com/mc/game/version_manifest_v2.json"
@@ -29,39 +30,38 @@ DECOMPILERS = {
     "fernflower": {},
     "cfr": {"version": "0.152"}
 }
+SideType: TypeAlias = Literal['client', 'server']
 
 cwd = Path(__file__).parent
 
-def get_minecraft_path():
+def get_minecraft_path() -> Path:
     if sys.platform.startswith('linux'):
-        return Path("~/.minecraft")
+        return Path("~", ".minecraft")
     elif sys.platform.startswith('win'):
-        return Path("~/AppData/Roaming/.minecraft")
+        return Path("~", "AppData", "Roaming", ".minecraft")
     elif sys.platform.startswith('darwin'):
-        return Path("~/Library/Application Support/minecraft")
-    else:
-        raise Exception(f"Unknown platform: {sys.platform}")
+        return Path("~", "Library", "Application Support", "minecraft")
+    raise RuntimeError(f"Platform {sys.platform} is not supported.")
 
 
 mc_path = get_minecraft_path()
 
 
-def str2bool(v):
+def str2bool(v: str | bool) -> bool:
     if isinstance(v, bool):
         return v
     if v.lower() in ('yes', 'true', 't', 'y', '1'):
         return True
     elif v.lower() in ('no', 'false', 'f', 'n', '0'):
         return False
-    else:
-        raise argparse.ArgumentTypeError('Boolean value expected.')
+    raise argparse.ArgumentTypeError(f'Could not convert {v} to a Boolean value.')
 
 def is_file_outdated(path):
     creation_time = datetime.datetime.fromtimestamp(os.path.getctime(path))
     yesterday = datetime.datetime.now() - datetime.timedelta(days=1)
     return creation_time < yesterday
 
-def check_java():
+def check_java() -> bool:
     """Check for a Java installation"""
     if sys.platform.startswith('win'):
         # Check Windows registry
@@ -111,12 +111,12 @@ def check_java():
             return True
 
     else:
-        raise Exception(f"Unknown platform: {sys.platform}")
+        raise OSError(f"Unknown platform: {sys.platform}")
     
-    raise Exception('Java JDK is not installed! Please install java JDK from https://java.oracle.com or OpenJDK.')
+    raise RuntimeError('Java JDK is not installed! Please install a Java JDK from https://java.oracle.com, or install OpenJDK.')
 
 
-def get_global_manifest(quiet):
+def get_global_manifest(quiet) -> None:
     version_manifest = cwd / "versions" / "version_manifest.json"
     if version_manifest.exists() and version_manifest.is_file() and not is_file_outdated(version_manifest):
         if not quiet:
@@ -125,7 +125,7 @@ def get_global_manifest(quiet):
     download_file(MANIFEST_LOCATION, version_manifest, quiet)
 
 
-def download_file(url, filename, quiet=True):
+def download_file(url: str, filename: Path, quiet=True) -> None:
     try:
         if not quiet:
             print(f'Downloading {url} to {filename}...')
@@ -145,22 +145,26 @@ def download_file(url, filename, quiet=True):
         raise e
 
 
-def get_latest_version():
+def get_latest_version() -> tuple[str | None, str | None]:
     path_to_json = cwd / "tmp" / "manifest.json"
     download_file(MANIFEST_LOCATION, path_to_json, True)
-    snapshot = None
-    version = None
-    if path_to_json.exists() and path_to_json.is_file():
+    snapshot: str | None = None
+    release: str | None = None
+    if path_to_json.is_file():
         path_to_json = path_to_json.resolve()
         with open(path_to_json) as f:
             versions = json.load(f)["latest"]
-            if versions and versions.get("release") and versions.get("release"):
-                version = versions.get("release")
+            if versions:
+                release = versions.get("release")
                 snapshot = versions.get("snapshot")
-    return snapshot, version
+
+    if snapshot is None or release is None:
+        raise RuntimeError("Error getting latest versions, please refresh cache")
+
+    return snapshot, release
 
 
-def get_version_manifest(target_version, quiet):
+def get_version_manifest(target_version: str, quiet: bool) -> None:
     version_json = cwd / "versions" / target_version / "version.json"
     if version_json.exists() and version_json.is_file():
         if not quiet:
@@ -168,7 +172,7 @@ def get_version_manifest(target_version, quiet):
         return
     version_manifest = cwd / "versions" / "version_manifest.json"
     if not (version_manifest.exists() and version_manifest.is_file()):
-        raise Exception('Missing manifest file: version.json')
+        raise RuntimeError(f'Missing manifest file: {version_manifest}')
     
     version_manifest = version_manifest.resolve()
     with open(version_manifest) as f:
@@ -188,7 +192,7 @@ def sha256(fname: Union[Union[str, bytes], int]):
     return hash_sha256.hexdigest()
 
 
-def get_version_jar(target_version, side, quiet):
+def get_version_jar(target_version: str, side: SideType, quiet) -> None:
     version_json = cwd / "versions" / target_version / "version.json"
     jar_path = cwd / "versions" / target_version / f"{side}.jar"
     if jar_path.exists() and jar_path.is_file():
@@ -219,7 +223,7 @@ def get_version_jar(target_version, side, quiet):
                 if content is not None:
                     element = content.split(b"\t")
                     if len(element) != 3:
-                        raise Exception(f"Jar should be extracted but version list is not in the correct format, expected 3 fields, got {len(element)} for {content}")
+                        raise RuntimeError(f"Jar should be extracted but version list is not in the correct format, expected 3 fields, got {len(element)} for {content}")
                     version_hash = element[0].decode()
                     version = element[1].decode()
                     path = element[2].decode()
@@ -238,7 +242,7 @@ def get_version_jar(target_version, side, quiet):
         print("Done!")
 
 
-def get_mappings(version, side, quiet):
+def get_mappings(version: str, side: SideType, quiet) -> None:
     mappings_file = cwd / "mappings" / version / f"{side}.txt"
     converted_mappings_file = cwd / "mappings" / version / f"{side}.tsrg"
     if (mappings_file.exists() and mappings_file.is_file()) or (converted_mappings_file.exists() and converted_mappings_file.is_file()):
@@ -258,30 +262,36 @@ def get_mappings(version, side, quiet):
                 print(f'Downloading the mappings for {version}...')
             download_file(url, mappings_file, quiet)
     else:
-        raise Exception('ERROR: Missing manifest file: version.json')
+        raise RuntimeError(f'Missing manifest file: {version_json}')
 
 
-def remap(version, side, quiet):
+def remap(version: str, side: SideType, quiet) -> None:
     if not quiet:
         print('=== Remapping jar using SpecialSource ====')
     t = time.time()
+
     path = cwd / "versions" / version / f"{side}.jar"
     # that part will not be assured by arguments
     if not path.exists() or not path.is_file():
         path_temp = (mc_path / "versions" / version / f"{version}.jar").expanduser()
         if path_temp.exists() and path_temp.is_file():
-            r = input("Error, defaulting to client.jar from your local Minecraft folder, continue? (y/n)") or "y"
-            if r != "y":
-                sys.exit(-1)
             path = path_temp
-    mapp = cwd / "mappings" / version / f"{side}.tsrg"
-    specialsource = cwd / "lib" / f"SpecialSource-{SPECIAL_SOURCE_VERSION}.jar"
-    if not (path.exists() and mapp.exists() and specialsource.exists() and path.is_file() and mapp.is_file() and specialsource.is_file()):
-       raise Exception(f'ERROR: Missing files: ./lib/SpecialSource-{SPECIAL_SOURCE_VERSION}.jar or mappings/{version}/{side}.tsrg or versions/{version}/{side}.jar')
+        else:
+            raise RuntimeError(f'Missing file: {path}')
     path = path.resolve()
+
+    mapp = cwd / "mappings" / version / f"{side}.tsrg"
+    if not mapp.exists() or not mapp.is_file():
+        raise RuntimeError(f'Missing file: {mapp}')
     mapp = mapp.resolve()
+
+    specialsource = cwd / "lib" / f"SpecialSource-{SPECIAL_SOURCE_VERSION}.jar"
+    if not specialsource.exists() or not specialsource.is_file():
+        raise RuntimeError(f'Missing file: {special_ource}')
     specialsource = specialsource.resolve()
+
     outpath = cwd / "src" / f"{version}-{side}-temp.jar"
+
     subprocess.run(['java',
                     '-jar', str(specialsource),
                     '--in-jar', str(path),
@@ -290,22 +300,27 @@ def remap(version, side, quiet):
                     "--kill-lvt"  # kill snowmen
                     ], check=True, capture_output=quiet)
     if not quiet:
-        print(f'- New -> {version}-{side}-temp.jar')
+        print(f'Created {outpath}.')
         t = time.time() - t
         print('Done in %.1fs' % t)
 
 
-def decompile_fernflower(decompiled_version, version, side, quiet, force):
+def decompile_fernflower(decompiled_version: str, version: str, side: SideType, quiet, force) -> None:
     if not quiet:
         print('=== Decompiling using FernFlower (silent) ===')
     t = time.time()
-    path = cwd / "src" / f"{version}-{side}-temp.jar"
-    fernflower = cwd / "lib" / "fernflower.jar"
-    if not (path.exists() and fernflower.exists()):
-        raise Exception(f'ERROR: Missing files: ./lib/fernflower.jar or ./src/{version}-{side}-temp.jar')
 
+    path = cwd / "src" / f"{version}-{side}-temp.jar"
+    if not path.exists() or not path.is_file():
+        raise RuntimeError(f'Missing file: {path}')
     path = path.resolve()
+
+    fernflower = cwd / "lib" / "fernflower.jar"
+    if not fernflower.exists() or not fernflower.is_file():
+        raise RuntimeError(f'Missing file: {fernflower}')
     fernflower = fernflower.resolve()
+
+    side_folder = cwd / "src" / decompiled_version / side
     subprocess.run(['java',
                     '-Xmx4G',
                     '-Xms1G',
@@ -316,59 +331,64 @@ def decompile_fernflower(decompiled_version, version, side, quiet, force):
                     '-lit=1',  # output numeric literals
                     '-asc=1',  # encode non-ASCII characters in string and character
                     '-log=WARN',
-                    str(path), f'./src/{decompiled_version}/{side}'
+                    str(path), side_folder
                     ], check=True, capture_output=quiet)
     if not quiet:
-        print(f'- Removing -> {version}-{side}-temp.jar')
+        print(f'Removing {path}...')
     os.remove(path)
     if not quiet:
-        print("Decompressing remapped jar to directory")
-
-    path = cwd / "src" / decompiled_version / side / f"{version}-{side}-temp.jar"
-    with zipfile.ZipFile() as z:
-        z.extractall(path=path.parent)
+        print("Decompressing remapped jar to directory...")
+    with zipfile.ZipFile(side_folder / f"{version}-{side}-temp.jar") as z:
+        z.extractall(path=side_folder)
     t = time.time() - t
     if not quiet:
         print(f'Done in %.1fs (file was decompressed in {decompiled_version}/{side})' % t)
+        # TODO: Automate choice if auto mode is enabled
         print('Remove Extra Jar file? (y/n): ')
         response = input() or "y"
         if response == 'y':
-            print(f'- Removing -> {decompiled_version}/{side}/{version}-{side}-temp.jar')
-            os.remove(path)
+            print(f'Removing {side_folder / f"{version}-{side}-temp.jar"}...')
+            os.remove(side_folder / f"{version}-{side}-temp.jar")
     if force:
-        os.remove(path)
+        os.remove(side_folder / f'{version}-{side}-temp.jar')
 
 
-def decompile_cfr(decompiled_version, version, side, quiet):
+def decompile_cfr(decompiled_version: str, version: str, side: SideType, quiet) -> None:
     if not quiet:
         print('=== Decompiling using CFR (silent) ===')
     t = time.time()
-    path = cwd / "src" / f"{version}-{side}-temp.jar"
-    cfr = cwd / "lib" / f"cfr-{DECOMPILERS['cfr']['version']}.jar"
-    if not (path.exists() and cfr.exists()):
-        raise Exception(f'ERROR: Missing files: ./lib/cfr-{DECOMPILERS['cfr']['version']}.jar or ./src/{version}-{side}-temp.jar')
 
+    path = cwd / "src" / f"{version}-{side}-temp.jar"
+    if not path.exists() or not path.is_file():
+        raise RuntimeError(f'Missing file: {path}')
     path = path.resolve()
+
+    cfr = cwd / "lib" / f"cfr-{DECOMPILERS["cfr"]["version"]}.jar"
+    if not cfr.exists() or not path.is_file():
+        raise RuntimeError(f'Missing file: {cfr}')
     cfr = cfr.resolve()
-    outpath = cwd / "src" / decompiled_version / side
+
+    side_folder = cwd / "src" / decompiled_version / side
+    side_folder.resolve()
+
     subprocess.run(['java',
                     '-Xmx4G',
                     '-Xms1G',
                     '-jar', str(cfr),
                     str(path),
-                    '--outputdir', str(outpath),
+                    '--outputdir', str(side_folder),
                     '--caseinsensitivefs', 'true',
                     "--silent", "true"
                     ], check=True, capture_output=quiet)
     if not quiet:
-        print(f'- Removing -> {version}-{side}-temp.jar')
-        print(f'- Removing -> summary.txt')
+        print(f'Removing {path}...')
     os.remove(path)
-    os.remove(cwd / "src" / decompiled_version / side / "summary.txt")
+    if not quiet:
+        print(f'Removing {side_folder / "summary.txt"}...')
+    os.remove(side_folder / "summary.txt")
     if not quiet:
         t = time.time() - t
         print('Done in %.1fs' % t)
-
 
 def decompile(decompiler, decompiled_version, version, side, quiet, force):
     if decompiler == "cfr":
@@ -377,20 +397,20 @@ def decompile(decompiler, decompiled_version, version, side, quiet, force):
         decompile_fernflower(decompiled_version, version, side, quiet, force)
 
 
-def remove_brackets(line, counter):
+def remove_brackets(line: str, counter: int) -> tuple[str, int]:
     while '[]' in line:  # get rid of the array brackets while counting them
         counter += 1
         line = line[:-2]
     return line, counter
 
 
-def remap_file_path(path):
+def remap_file_path(path: str) -> str:
     remap_primitives = {"int": "I", "double": "D", "boolean": "Z", "float": "F", "long": "J", "byte": "B", "short": "S",
                         "char": "C", "void": "V"}
     return "L" + "/".join(path.split(".")) + ";" if path not in remap_primitives else remap_primitives[path]
 
 
-def convert_mappings(version, side, quiet):
+def convert_mappings(version: str, side: SideType, quiet: bool) -> None:
     dir_path = cwd / "mappings" / version
     mappings_file = dir_path / f"{side}.txt"
     converted_mappings_file = dir_path / f"{side}.tsrg"
@@ -401,7 +421,7 @@ def convert_mappings(version, side, quiet):
         return
 
     with open(mappings_file, 'r') as inputFile:
-        file_name = {}
+        file_name: dict[str, str] = {}
         for line in inputFile.readlines():
             if line.startswith('#'):  # comment at the top, could be stripped
                 continue
@@ -452,7 +472,7 @@ def convert_mappings(version, side, quiet):
                         variables = ["/".join(variable.split(".")) if "." in variable else variable for variable in
                                      variables]  # if the class is already packaged then change the obfuscated name
                         for i in range(len(variables)):  # restore the array brackets upfront for each variable
-                            for j in range(array_length_variables[i]):
+                            for _ in range(array_length_variables[i]):
                                 if variables[i][-1] == ";":
                                     variables[i] = "[" + variables[i][:-1] + ";"
                                 else:
@@ -470,7 +490,7 @@ def convert_mappings(version, side, quiet):
         print("Mappings converted!")
 
 
-def make_paths(version, side, quiet, clean, force):
+def make_paths(version: str, side: SideType, quiet: bool, clean: bool, force: bool) -> str:
     path = cwd / "mappings" / version
     if not path.exists():
         path.mkdir(parents=True)
@@ -498,7 +518,7 @@ def make_paths(version, side, quiet, clean, force):
             path.mkdir(parents=True)
         else:
             aw = input(f"versions/{version}/{side}.jar already exists, wipe it (w) or ignore (i) ? ") or "i"
-            path = cwd / Path(f'versions/{version}')
+            path = cwd / 'versions' / version
             if aw == "w":
                 shutil.rmtree(path)
                 path.mkdir(parents=True)
@@ -507,7 +527,7 @@ def make_paths(version, side, quiet, clean, force):
     if not path.exists():
         path.mkdir(parents=True)
     else:
-        if force:
+        if clean or force:
             shutil.rmtree(path)
         else:
             if not quiet:
@@ -523,6 +543,7 @@ def make_paths(version, side, quiet, clean, force):
         if clean:
             shutil.rmtree(path)
             path.mkdir(parents=True)
+
     return version
 
 
@@ -544,8 +565,6 @@ def run(version, side, decompiler="cfr", quiet=False, clean=False, force=False):
 def main():
     check_java()
     snapshot, latest = get_latest_version()
-    if snapshot is None or latest is None:
-        raise Exception("Error getting latest versions, please refresh cache")
     # for arguments
     parser = argparse.ArgumentParser(description='Decompile Minecraft source code')
     parser.add_argument('mcversion', type=str, nargs="?", default=latest,
@@ -600,7 +619,7 @@ def main():
             raise e
     if not args.quiet:
         print("===FINISHED===")
-        print(f"output is in /src/{decompiled_version}")
+        print(f"Output is in /src/{decompiled_version}")
 
 
 if __name__ == "__main__":
