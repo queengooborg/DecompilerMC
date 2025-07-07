@@ -330,13 +330,6 @@ def decompile_fernflower(decompiled_version: str, version: str, side: SideType, 
     logging.info("Decompressing remapped jar to directory...")
     with zipfile.ZipFile(side_folder / f"{version}-{side}-temp.jar") as z:
         z.extractall(path=side_folder)
-    if not quiet:
-        # TODO: Automate choice if auto mode is enabled
-        print('Remove Extra Jar file? (y/n): ')
-        response = input() or "y"
-        if response == 'y':
-            print(f'Removing {side_folder / f"{version}-{side}-temp.jar"}...')
-            os.remove(side_folder / f"{version}-{side}-temp.jar")
     logging.info(f'File decompressed in {decompiled_version}/{side}')
     logging.debug(f'Done in %.1fs ()' % (time.time() - t))
     if force:
@@ -497,12 +490,6 @@ def make_paths(version: str, side: SideType, quiet: bool, clean: bool, force: bo
             path = cwd / Path(f'versions/{version}')
             shutil.rmtree(path)
             path.mkdir(parents=True)
-        else:
-            aw = input(f"versions/{version}/{side}.jar already exists, wipe it (w) or ignore (i) ? ") or "i"
-            path = cwd / 'versions' / version
-            if aw == "w":
-                shutil.rmtree(path)
-                path.mkdir(parents=True)
 
     path = cwd / "src" / version / side
     if not path.exists():
