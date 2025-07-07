@@ -35,7 +35,7 @@ SideType: TypeAlias = Literal['client', 'server']
 
 cwd = Path(__file__).parent
 
-logging.basicConfig(format="%(levelname)s: %(message)s")
+logging.basicConfig(format="%(levelname)s: %(message)s", level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 def get_minecraft_path() -> Path:
@@ -123,15 +123,15 @@ def check_java() -> bool:
     raise RuntimeError('Java JDK is not installed! Please install a Java JDK from https://java.oracle.com, or install OpenJDK.')
 
 
-def get_global_manifest(quiet) -> None:
+def get_global_manifest() -> None:
     version_manifest = cwd / "versions" / "version_manifest.json"
     if version_manifest.exists() and version_manifest.is_file() and not is_file_outdated(version_manifest):
         logging.info("Manifest already exists, not downloading again")
         return
-    download_file(MANIFEST_LOCATION, version_manifest, quiet)
+    download_file(MANIFEST_LOCATION, version_manifest)
 
 
-def download_file(url: str, filename: Path, quiet=True) -> None:
+def download_file(url: str, filename: Path) -> None:
     try:
         logging.debug(f'Downloading {url} to {filename}...')
         f = urllib.request.urlopen(url)
@@ -150,7 +150,7 @@ def download_file(url: str, filename: Path, quiet=True) -> None:
 
 def get_latest_version() -> tuple[str | None, str | None]:
     path_to_json = cwd / "tmp" / "manifest.json"
-    download_file(MANIFEST_LOCATION, path_to_json, True)
+    download_file(MANIFEST_LOCATION, path_to_json)
     snapshot: str | None = None
     release: str | None = None
     if path_to_json.is_file():
@@ -167,7 +167,7 @@ def get_latest_version() -> tuple[str | None, str | None]:
     return snapshot, release
 
 
-def get_version_manifest(target_version: str, quiet: bool) -> None:
+def get_version_manifest(target_version: str) -> None:
     version_json = cwd / "versions" / target_version / "version.json"
     if version_json.exists() and version_json.is_file():
         logging.info("Version manifest already exists, not downloading again")
@@ -181,7 +181,7 @@ def get_version_manifest(target_version: str, quiet: bool) -> None:
         versions = json.load(f)["versions"]
         for version in versions:
             if version.get("id") and version.get("id") == target_version and version.get("url"):
-                download_file(version.get("url"), version_json, quiet)
+                download_file(version.get("url"), version_json)
                 break
 
 
@@ -194,7 +194,7 @@ def sha256(fname: Union[Union[str, bytes], int]) -> str:
     return hash_sha256.hexdigest()
 
 
-def get_version_jar(target_version: str, side: SideType, quiet) -> None:
+def get_version_jar(target_version: str, side: SideType) -> None:
     version_json = cwd / "versions" / target_version / "version.json"
     jar_path = cwd / "versions" / target_version / f"{side}.jar"
     if jar_path.exists() and jar_path.is_file():
@@ -208,7 +208,7 @@ def get_version_jar(target_version: str, side: SideType, quiet) -> None:
         if not (jsn.get("downloads") and jsn.get("downloads").get(side) and jsn.get("downloads").get(side).get("url")):
             raise Exception("Could not download jar, missing fields")
 
-        download_file(jsn.get("downloads").get(side).get("url"), jar_path, quiet)
+        download_file(jsn.get("downloads").get(side).get("url"), jar_path)
         # In case the server is newer than 21w39a you need to actually extract it first from the archive
         if side == SERVER:
             if not Path(jar_path).exists():
@@ -242,7 +242,7 @@ def get_version_jar(target_version: str, side: SideType, quiet) -> None:
     logging.info("Done!")
 
 
-def get_mappings(version: str, side: SideType, quiet) -> None:
+def get_mappings(version: str, side: SideType) -> None:
     mappings_file = cwd / "mappings" / version / f"{side}.txt"
     converted_mappings_file = cwd / "mappings" / version / f"{side}.tsrg"
     if (mappings_file.exists() and mappings_file.is_file()) or (converted_mappings_file.exists() and converted_mappings_file.is_file()):
@@ -257,12 +257,12 @@ def get_mappings(version: str, side: SideType, quiet) -> None:
             if not url:
                 raise Exception(f'Error: {side} mappings for {version} not available from version.json')
             logging.info(f'Downloading the mappings for {version}...')
-            download_file(url, mappings_file, quiet)
+            download_file(url, mappings_file)
     else:
         raise RuntimeError(f'Missing manifest file: {version_json}')
 
 
-def remap(version: str, side: SideType, quiet) -> None:
+def remap(version: str, side: SideType) -> None:
     logging.info('=== Remapping jar using SpecialSource ====')
     t = time.time()
 
@@ -294,12 +294,12 @@ def remap(version: str, side: SideType, quiet) -> None:
                     '--out-jar', str(outpath),
                     '--srg-in', str(mapp),
                     "--kill-lvt"  # kill snowmen
-                    ], check=True, capture_output=quiet)
+                    ], check=True, capture_output=logger.level >= logging.INFO)
     logging.info(f'Created {outpath}')
     logging.debug('Done in %.1fs' % (time.time() - t))
 
 
-def decompile_fernflower(decompiled_version: str, version: str, side: SideType, quiet, force) -> None:
+def decompile_fernflower(decompiled_version: str, version: str, side: SideType, force) -> None:
     logging.info('=== Decompiling using FernFlower (silent) ===')
     t = time.time()
 
@@ -325,7 +325,7 @@ def decompile_fernflower(decompiled_version: str, version: str, side: SideType, 
                     '-asc=1',  # encode non-ASCII characters in string and character
                     '-log=WARN',
                     str(path), side_folder
-                    ], check=True, capture_output=quiet)
+                    ], check=True, capture_output=logger.level >= logging.INFO)
     delete_file(path)
     logging.info("Decompressing remapped jar to directory...")
     with zipfile.ZipFile(side_folder / f"{version}-{side}-temp.jar") as z:
@@ -336,7 +336,7 @@ def decompile_fernflower(decompiled_version: str, version: str, side: SideType, 
         delete_file(side_folder / f'{version}-{side}-temp.jar')
 
 
-def decompile_cfr(decompiled_version: str, version: str, side: SideType, quiet: bool) -> None:
+def decompile_cfr(decompiled_version: str, version: str, side: SideType) -> None:
     logging.info('=== Decompiling using CFR (silent) ===')
     t = time.time()
 
@@ -361,16 +361,16 @@ def decompile_cfr(decompiled_version: str, version: str, side: SideType, quiet: 
                     '--outputdir', str(side_folder),
                     '--caseinsensitivefs', 'true',
                     "--silent", "true"
-                    ], check=True, capture_output=quiet)
+                    ], check=True, capture_output=logger.level >= logging.INFO)
     delete_file(path)
     delete_file(side_folder / "summary.txt")
     logging.debug('Done in %.1fs' % (time.time() - t))
 
-def decompile(decompiler: str, decompiled_version: str, version: str, side: SideType, quiet: bool, force: bool) -> None:
+def decompile(decompiler: str, decompiled_version: str, version: str, side: SideType, force: bool) -> None:
     if decompiler == "cfr":
-        decompile_cfr(decompiled_version, version, side, quiet)
+        decompile_cfr(decompiled_version, version, side)
     else:
-        decompile_fernflower(decompiled_version, version, side, quiet, force)
+        decompile_fernflower(decompiled_version, version, side, force)
 
 
 def remove_brackets(line: str, counter: int) -> tuple[str, int]:
@@ -386,7 +386,7 @@ def remap_file_path(path: str) -> str:
     return "L" + "/".join(path.split(".")) + ";" if path not in remap_primitives else remap_primitives[path]
 
 
-def convert_mappings(version: str, side: SideType, quiet: bool) -> None:
+def convert_mappings(version: str, side: SideType) -> None:
     dir_path = cwd / "mappings" / version
     mappings_file = dir_path / f"{side}.txt"
     converted_mappings_file = dir_path / f"{side}.tsrg"
@@ -464,7 +464,7 @@ def convert_mappings(version: str, side: SideType, quiet: bool) -> None:
     logging.info("Mappings converted!")
 
 
-def make_paths(version: str, side: SideType, quiet: bool, clean: bool, force: bool) -> str:
+def make_paths(version: str, side: SideType, clean: bool, force: bool) -> str:
     path = cwd / "mappings" / version
     if not path.exists():
         path.mkdir(parents=True)
@@ -514,17 +514,17 @@ def make_paths(version: str, side: SideType, quiet: bool, clean: bool, force: bo
     return version
 
 
-def run(version: str, side: SideType, decompiler="cfr", quiet=False, clean=False, force=False) -> str:
-    decompiled_version = make_paths(version, side, quiet, clean, force)
-    get_global_manifest(quiet)
-    get_version_manifest(version, quiet)
+def run(version: str, side: SideType, decompiler="cfr", clean=False, force=False) -> str:
+    decompiled_version = make_paths(version, side, clean, force)
+    get_global_manifest()
+    get_version_manifest(version)
 
-    get_mappings(version, side, quiet)
-    convert_mappings(version, side, quiet)
-    get_version_jar(version, side, quiet)
-    remap(version, side, quiet)
+    get_mappings(version, side)
+    convert_mappings(version, side)
+    get_version_jar(version, side)
+    remap(version, side)
 
-    decompile(decompiler, decompiled_version, version, side, quiet, force)
+    decompile(decompiler, decompiled_version, version, side, force)
 
     return decompiled_version
 
@@ -538,7 +538,7 @@ def main():
                         help=f"The version you want to decompile (any version starting from 19w36a (snapshot) and 1.14.4 (releases))\n"
                              f"Use 'snap' for latest snapshot ({snapshot}) or 'latest' for latest version ({latest})")
     parser.add_argument('--interactive', '-i', type=str2bool, default=False,
-                        help="Enable an interactive CLI to specify options (all other command line arguments, besides --quiet, will be ignored)")
+                        help="Enable an interactive CLI to specify options (all other command line arguments, besides --will be ignored)")
     parser.add_argument('--side', '-s', type=str, dest='side', default="client", choices=["client", "server"],
                         help='Whether to decompile the client side or server side')
     parser.add_argument('--clean', '-c', dest='clean', action='store_true', default=False,
@@ -574,7 +574,7 @@ def main():
         if args.quiet:
             logging.basicConfig(level=logging.ERROR)
 
-        decompiled_version = run(args.mcversion, args.side, args.decompiler, args.quiet, args.clean, args.force)
+        decompiled_version = run(args.mcversion, args.side, args.decompiler, args.clean, args.force)
 
     except KeyboardInterrupt:
         logging.info("Keyboard interrupt detected, exiting")
