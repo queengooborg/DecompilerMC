@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 import argparse
+import datetime
 import glob
 import json
 import os
@@ -55,6 +56,10 @@ def str2bool(v):
     else:
         raise argparse.ArgumentTypeError('Boolean value expected.')
 
+def is_file_outdated(path):
+    creation_time = datetime.datetime.fromtimestamp(os.path.getctime(path))
+    yesterday = datetime.datetime.now() - datetime.timedelta(days=1)
+    return creation_time < yesterday
 
 def check_java():
     """Check for a Java installation"""
@@ -113,7 +118,7 @@ def check_java():
 
 def get_global_manifest(quiet):
     version_manifest = cwd / "versions" / "version_manifest.json"
-    if version_manifest.exists() and version_manifest.is_file():
+    if version_manifest.exists() and version_manifest.is_file() and not is_file_outdated(version_manifest):
         if not quiet:
             print("Manifest already exists, not downloading again")
         return
