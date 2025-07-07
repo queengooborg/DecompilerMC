@@ -43,7 +43,6 @@ def get_minecraft_path() -> Path:
         return Path("~", "Library", "Application Support", "minecraft")
     raise RuntimeError(f"Platform {sys.platform} is not supported.")
 
-
 mc_path = get_minecraft_path()
 
 
@@ -56,7 +55,7 @@ def str2bool(v: str | bool) -> bool:
         return False
     raise argparse.ArgumentTypeError(f'Could not convert {v} to a Boolean value.')
 
-def is_file_outdated(path):
+def is_file_outdated(path: Path) -> bool:
     creation_time = datetime.datetime.fromtimestamp(os.path.getctime(path))
     yesterday = datetime.datetime.now() - datetime.timedelta(days=1)
     return creation_time < yesterday
@@ -183,7 +182,7 @@ def get_version_manifest(target_version: str, quiet: bool) -> None:
                 break
 
 
-def sha256(fname: Union[Union[str, bytes], int]):
+def sha256(fname: Union[Union[str, bytes], int]) -> str:
     import hashlib
     hash_sha256 = hashlib.sha256()
     with open(fname, "rb") as f:
@@ -353,7 +352,7 @@ def decompile_fernflower(decompiled_version: str, version: str, side: SideType, 
         os.remove(side_folder / f'{version}-{side}-temp.jar')
 
 
-def decompile_cfr(decompiled_version: str, version: str, side: SideType, quiet) -> None:
+def decompile_cfr(decompiled_version: str, version: str, side: SideType, quiet: bool) -> None:
     if not quiet:
         print('=== Decompiling using CFR (silent) ===')
     t = time.time()
@@ -390,7 +389,7 @@ def decompile_cfr(decompiled_version: str, version: str, side: SideType, quiet) 
         t = time.time() - t
         print('Done in %.1fs' % t)
 
-def decompile(decompiler, decompiled_version, version, side, quiet, force):
+def decompile(decompiler: str, decompiled_version: str, version: str, side: SideType, quiet: bool, force: bool) -> None:
     if decompiler == "cfr":
         decompile_cfr(decompiled_version, version, side, quiet)
     else:
@@ -547,7 +546,7 @@ def make_paths(version: str, side: SideType, quiet: bool, clean: bool, force: bo
     return version
 
 
-def run(version, side, decompiler="cfr", quiet=False, clean=False, force=False):
+def run(version: str, side: SideType, decompiler="cfr", quiet=False, clean=False, force=False) -> str:
     decompiled_version = make_paths(version, side, quiet, clean, force)
     get_global_manifest(quiet)
     get_version_manifest(version, quiet)
@@ -568,7 +567,7 @@ def main():
     # for arguments
     parser = argparse.ArgumentParser(description='Decompile Minecraft source code')
     parser.add_argument('mcversion', type=str, nargs="?", default=latest,
-                        help=f"The version you want to decompile (alid version starting from 19w36a (snapshot) and 1.14.4 (releases))\n"
+                        help=f"The version you want to decompile (any version starting from 19w36a (snapshot) and 1.14.4 (releases))\n"
                              f"Use 'snap' for latest snapshot ({snapshot}) or 'latest' for latest version ({latest})")
     parser.add_argument('--interactive', '-i', type=str2bool, default=False,
                         help="Enable an interactive CLI to specify options (all other command line arguments, besides --quiet, will be ignored)")

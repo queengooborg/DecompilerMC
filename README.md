@@ -22,7 +22,7 @@ usage: main.py [-h] [--interactive INTERACTIVE] [--side {client,server}] [--clea
 Decompile Minecraft source code
 
 positional arguments:
-  mcversion             The version you want to decompile (alid version starting from 19w36a (snapshot) and 1.14.4 (releases)) Use 'snap' for
+  mcversion             The version you want to decompile (any version starting from 19w36a (snapshot) and 1.14.4 (releases)) Use 'snap' for
                         latest snapshot or 'latest' for latest version
 
 options:
