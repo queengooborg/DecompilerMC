@@ -609,7 +609,7 @@ def main():
         if not args.quiet:
             print("Keyboard interrupt detected, exiting")
         sys.exit(-1)
-    except Exception as e:
+    except (Exception, RuntimeError, OSError) as e:
         if not args.quiet:
             print("===Error detected!===")
             traceback.print_exc()
