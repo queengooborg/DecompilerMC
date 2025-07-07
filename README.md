@@ -6,18 +6,14 @@ Your output will be readable/executable code similar to ModCoderPack or other de
 
 ## Prerequisites
 
-You will need
-- an Internet connection to download the mappings. You can obviously put them in the respective folder if you have them physically.
-- Windows, MacOS, or Linux.
-- A Java runtime inside your path (Java 8 should be good).
+- An Internet connection (to download the mappings)
+- Windows, macOS, or Linux
+- Java 8 or higher
+- Python 3.7 or higher
 
-You can run this directly with Python 3.7+ with `python3 main.py`. CFR decompilation takes approximately 60s and fernflower takes roughly 200s. The code will then be inside the folder called `./src/<name_version(option_hash)>/<side>`; you can find the jar and the version manifest in the `./versions/` directory.
+## Running
 
-The `./tmp/` directory can be removed without impact.
-
-There is a common release here: https://github.com/hube12/DecompilerMC/releases/latest for all versions.
-
-----
+Simply run `python3 main.py` in your terminal. You can also specify the following arguments and options:
 
 ```bash
 usage: main.py [-h] [--interactive INTERACTIVE] [--side {client,server}] [--clean] [--force] [--decompiler {fernflower,cfr}] [--quiet]
@@ -47,10 +43,18 @@ Examples:
 - Decompile latest snapshot server side with output: `python3 main.py snap --side server` 
 - Decompile 1.14.4 client side with output, cleaning up old runs:  `python3 main.py 1.14.4 -s client -f -q -c` 
 
-----
+CFR decompilation takes approximately 60s and fernflower takes roughly 200s. The code will then be inside the folder called `./src/<name_version(option_hash)>/<side>`; you can find the jar and the version manifest in the `./versions/` directory.
 
-To build as an executable, the commands are
-```python
-pip install pyinstaller
+The `./tmp/` directory can be removed without impact.
+
+There is a common release here: https://github.com/hube12/DecompilerMC/releases/latest for all versions.
+
+## Building Executable
+
+To build DecompilerMC as an executable using `pyinstaller`, you can run the following:
+
+```sh
 pyinstaller main.py --distpath build --onefile
 ```
+
+If you do not have `pyinstaller`, you can install it via `pip`: `pip install pyinstaller`
