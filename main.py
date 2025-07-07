@@ -4,6 +4,7 @@ import datetime
 import glob
 import hashlib
 import json
+import logging
 import os
 import random
 import shutil
@@ -34,6 +35,9 @@ SideType: TypeAlias = Literal['client', 'server']
 
 cwd = Path(__file__).parent
 
+logging.basicConfig(format="%(levelname)s: %(message)s")
+logger = logging.getLogger(__name__)
+
 def get_minecraft_path() -> Path:
     if sys.platform.startswith('linux'):
         return Path("~", ".minecraft")
@@ -59,6 +63,10 @@ def is_file_outdated(path: Path) -> bool:
     creation_time = datetime.datetime.fromtimestamp(os.path.getctime(path))
     yesterday = datetime.datetime.now() - datetime.timedelta(days=1)
     return creation_time < yesterday
+
+def delete_file(path: Path) -> None:
+    logging.debug(f"Removing {path}...")
+    os.remove(path)
 
 def check_java() -> bool:
     """Check for a Java installation"""
@@ -118,28 +126,24 @@ def check_java() -> bool:
 def get_global_manifest(quiet) -> None:
     version_manifest = cwd / "versions" / "version_manifest.json"
     if version_manifest.exists() and version_manifest.is_file() and not is_file_outdated(version_manifest):
-        if not quiet:
-            print("Manifest already exists, not downloading again")
+        logging.info("Manifest already exists, not downloading again")
         return
     download_file(MANIFEST_LOCATION, version_manifest, quiet)
 
 
 def download_file(url: str, filename: Path, quiet=True) -> None:
     try:
-        if not quiet:
-            print(f'Downloading {url} to {filename}...')
+        logging.debug(f'Downloading {url} to {filename}...')
         f = urllib.request.urlopen(url)
         if filename.exists():
             filename.unlink()
         filename.parent.mkdir(parents=True, exist_ok=True)
         with open(filename, 'wb+') as local_file:
             local_file.write(f.read())
-            if not quiet:
-                print(f'Downloaded {filename} successfully!')
+            logging.debug(f'Downloaded {filename} successfully!')
     except (HTTPError, URLError) as e:
         if Path(filename).exists():
-            if not quiet:
-                print(f'Failed to download {filename}, using cached version')
+            logging.warning(f'Failed to download {filename}, using cached version')
             return
         raise e
 
@@ -166,8 +170,7 @@ def get_latest_version() -> tuple[str | None, str | None]:
 def get_version_manifest(target_version: str, quiet: bool) -> None:
     version_json = cwd / "versions" / target_version / "version.json"
     if version_json.exists() and version_json.is_file():
-        if not quiet:
-            print("Version manifest already exists, not downloading again")
+        logging.info("Version manifest already exists, not downloading again")
         return
     version_manifest = cwd / "versions" / "version_manifest.json"
     if not (version_manifest.exists() and version_manifest.is_file()):
@@ -195,11 +198,10 @@ def get_version_jar(target_version: str, side: SideType, quiet) -> None:
     version_json = cwd / "versions" / target_version / "version.json"
     jar_path = cwd / "versions" / target_version / f"{side}.jar"
     if jar_path.exists() and jar_path.is_file():
-        if not quiet:
-            print(f"{jar_path} already exists, not downloading again")
+        logging.info(f"{jar_path} already exists, not downloading again")
         return
     if not (version_json.exists() and version_json.is_file()):
-        raise Exception('ERROR: Missing manifest file: version.json')
+        raise Exception('Missing manifest file: version.json')
 
     with open(version_json) as f:
         jsn = json.load(f)
@@ -226,8 +228,8 @@ def get_version_jar(target_version: str, side: SideType, quiet) -> None:
                     version_hash = element[0].decode()
                     version = element[1].decode()
                     path = element[2].decode()
-                    if version != target_version and not quiet:
-                        print(f"Warning, version is not identical to the one targeted got {version} exepected {target_version}")
+                    if version != target_version:
+                        logging.warning(f"Version is not identical to the one targeted got {version} exepected {target_version}")
                     new_jar_path = f"versions/{target_version}"
                     new_jar_path = z.extract(f"META-INF/versions/{path}", new_jar_path)
                     if not Path(new_jar_path).exists():
@@ -237,36 +239,31 @@ def get_version_jar(target_version: str, side: SideType, quiet) -> None:
                         raise Exception(f"Extracted file hash and expected hash did not match up, got {file_hash} expected {version_hash}")
                     shutil.move(new_jar_path, jar_path)
                     shutil.rmtree(f"versions/{target_version}/META-INF")            
-    if not quiet:
-        print("Done!")
+    logging.info("Done!")
 
 
 def get_mappings(version: str, side: SideType, quiet) -> None:
     mappings_file = cwd / "mappings" / version / f"{side}.txt"
     converted_mappings_file = cwd / "mappings" / version / f"{side}.tsrg"
     if (mappings_file.exists() and mappings_file.is_file()) or (converted_mappings_file.exists() and converted_mappings_file.is_file()):
-        if not quiet:
-            print("Mappings already exist, not downloading again")
+        logging.info("Mappings already exist, not downloading again")
         return
     version_json = cwd / "versions" / version / "version.json"
     if version_json.exists() and version_json.is_file():
-        if not quiet:
-            print(f'Found {version}.json')
+        logging.debug(f'Found {version}.json')
         with open(version_json) as f:
             jfile = json.load(f)
             url = jfile['downloads'].get(f'{side}_mappings', {}).get('url')
             if not url:
                 raise Exception(f'Error: {side} mappings for {version} not available from version.json')
-            if not quiet:
-                print(f'Downloading the mappings for {version}...')
+            logging.info(f'Downloading the mappings for {version}...')
             download_file(url, mappings_file, quiet)
     else:
         raise RuntimeError(f'Missing manifest file: {version_json}')
 
 
 def remap(version: str, side: SideType, quiet) -> None:
-    if not quiet:
-        print('=== Remapping jar using SpecialSource ====')
+    logging.info('=== Remapping jar using SpecialSource ====')
     t = time.time()
 
     path = cwd / "versions" / version / f"{side}.jar"
@@ -298,15 +295,12 @@ def remap(version: str, side: SideType, quiet) -> None:
                     '--srg-in', str(mapp),
                     "--kill-lvt"  # kill snowmen
                     ], check=True, capture_output=quiet)
-    if not quiet:
-        print(f'Created {outpath}.')
-        t = time.time() - t
-        print('Done in %.1fs' % t)
+    logging.info(f'Created {outpath}')
+    logging.debug('Done in %.1fs' % (time.time() - t))
 
 
 def decompile_fernflower(decompiled_version: str, version: str, side: SideType, quiet, force) -> None:
-    if not quiet:
-        print('=== Decompiling using FernFlower (silent) ===')
+    logging.info('=== Decompiling using FernFlower (silent) ===')
     t = time.time()
 
     path = cwd / "src" / f"{version}-{side}-temp.jar"
@@ -332,29 +326,25 @@ def decompile_fernflower(decompiled_version: str, version: str, side: SideType, 
                     '-log=WARN',
                     str(path), side_folder
                     ], check=True, capture_output=quiet)
-    if not quiet:
-        print(f'Removing {path}...')
-    os.remove(path)
-    if not quiet:
-        print("Decompressing remapped jar to directory...")
+    delete_file(path)
+    logging.info("Decompressing remapped jar to directory...")
     with zipfile.ZipFile(side_folder / f"{version}-{side}-temp.jar") as z:
         z.extractall(path=side_folder)
-    t = time.time() - t
     if not quiet:
-        print(f'Done in %.1fs (file was decompressed in {decompiled_version}/{side})' % t)
         # TODO: Automate choice if auto mode is enabled
         print('Remove Extra Jar file? (y/n): ')
         response = input() or "y"
         if response == 'y':
             print(f'Removing {side_folder / f"{version}-{side}-temp.jar"}...')
             os.remove(side_folder / f"{version}-{side}-temp.jar")
+    logging.info(f'File decompressed in {decompiled_version}/{side}')
+    logging.debug(f'Done in %.1fs ()' % (time.time() - t))
     if force:
-        os.remove(side_folder / f'{version}-{side}-temp.jar')
+        delete_file(side_folder / f'{version}-{side}-temp.jar')
 
 
 def decompile_cfr(decompiled_version: str, version: str, side: SideType, quiet: bool) -> None:
-    if not quiet:
-        print('=== Decompiling using CFR (silent) ===')
+    logging.info('=== Decompiling using CFR (silent) ===')
     t = time.time()
 
     path = cwd / "src" / f"{version}-{side}-temp.jar"
@@ -379,15 +369,9 @@ def decompile_cfr(decompiled_version: str, version: str, side: SideType, quiet: 
                     '--caseinsensitivefs', 'true',
                     "--silent", "true"
                     ], check=True, capture_output=quiet)
-    if not quiet:
-        print(f'Removing {path}...')
-    os.remove(path)
-    if not quiet:
-        print(f'Removing {side_folder / "summary.txt"}...')
-    os.remove(side_folder / "summary.txt")
-    if not quiet:
-        t = time.time() - t
-        print('Done in %.1fs' % t)
+    delete_file(path)
+    delete_file(side_folder / "summary.txt")
+    logging.debug('Done in %.1fs' % (time.time() - t))
 
 def decompile(decompiler: str, decompiled_version: str, version: str, side: SideType, quiet: bool, force: bool) -> None:
     if decompiler == "cfr":
@@ -415,8 +399,7 @@ def convert_mappings(version: str, side: SideType, quiet: bool) -> None:
     converted_mappings_file = dir_path / f"{side}.tsrg"
 
     if (converted_mappings_file.exists() and converted_mappings_file.is_file()):
-        if not quiet:
-            print(f"{side} mappings file for {version} already converted, not converting again")
+        logging.info(f"'{side}' mappings file for {version} already converted, not converting again")
         return
 
     with open(mappings_file, 'r') as inputFile:
@@ -485,8 +468,7 @@ def convert_mappings(version: str, side: SideType, quiet: bool) -> None:
             else:
                 obf_name = obf_name.split(":")[0]
                 outputFile.write(remap_file_path(obf_name)[1:-1] + " " + remap_file_path(deobf_name)[1:-1] + "\n")
-    if not quiet:
-        print("Mappings converted!")
+    logging.info("Mappings converted!")
 
 
 def make_paths(version: str, side: SideType, quiet: bool, clean: bool, force: bool) -> str:
@@ -529,8 +511,7 @@ def make_paths(version: str, side: SideType, quiet: bool, clean: bool, force: bo
         if clean or force:
             shutil.rmtree(path)
         else:
-            if not quiet:
-                print(f"{path} exists, creating new directory")
+            logging.warning(f"{path} exists, creating new directory")
             version = version + side + "_" + str(random.getrandbits(128))
         path = cwd / "src" / version / side
         path.mkdir(parents=True)
@@ -603,22 +584,20 @@ def main():
             args.side = SERVER if input("Please select either client or server side (C/s): ").lower() in ["server", "s"] else CLIENT
             args.decompiler = "fernflower" if input("Please input your decompiler of choice: cfr or fernflower (CFR/f): ").lower() in ["fernflower", "f"] else "cfr"
 
+        if args.quiet:
+            logging.basicConfig(level=logging.ERROR)
+
         decompiled_version = run(args.mcversion, args.side, args.decompiler, args.quiet, args.clean, args.force)
 
     except KeyboardInterrupt:
-        if not args.quiet:
-            print("Keyboard interrupt detected, exiting")
+        logging.info("Keyboard interrupt detected, exiting")
         sys.exit(-1)
     except (Exception, RuntimeError, OSError) as e:
-        if not args.quiet:
-            print("===Error detected!===")
-            traceback.print_exc()
-            sys.exit(-1)
-        else:
-            raise e
-    if not args.quiet:
-        print("===FINISHED===")
-        print(f"Output is in /src/{decompiled_version}")
+        logging.critical("===Error detected!===")
+        traceback.print_exc()
+        sys.exit(-1)
+    logging.info("===FINISHED===")
+    logging.info(f"Output is in /src/{decompiled_version}")
 
 
 if __name__ == "__main__":
