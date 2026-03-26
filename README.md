@@ -5,9 +5,7 @@
 
 # DecompilerMC
 
-This tool automatically decompiles and remaps specific Minecraft versions. (Specifically, it converts Mojang's mappings from their proguard format to the tsrg format. SpecialSource then uses that and remaps the client jar, which is then decompiled either with CFR (code only) or Fernflower (assets and code).)
-
-Your output will be readable/executable code similar to ModCoderPack or other decompilers.
+This tool allows you to download and extract the source code for a specified Minecraft version for modding purposes. On applicable versions (1.14.4 to 1.21.11), it obtains the deobfuscation mappings provided by Mojang and applies them. It then decompiles the JAR and outputs the contents, providing readable/executable code similar to ModCoderPack or other decompilers.
 
 ## Prerequisites
 
