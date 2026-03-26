@@ -372,7 +372,6 @@ def decompile(decompiler: str, decompiled_version: str, version: str, side: Side
     else:
         decompile_fernflower(decompiled_version, version, side, force)
 
-
 def remove_brackets(line: str, counter: int) -> tuple[str, int]:
     while '[]' in line:  # get rid of the array brackets while counting them
         counter += 1
@@ -519,10 +518,17 @@ def run(version: str, side: SideType, decompiler="cfr", clean=False, force=False
     get_global_manifest()
     get_version_manifest(version)
 
-    get_mappings(version, side)
-    convert_mappings(version, side)
     get_version_jar(version, side)
-    remap(version, side)
+
+    if version >= "26.1":
+        # MC 26.1+ does not have any obfuscation
+        inpath = cwd / "versions" / version / f"{side}.jar"
+        outpath = cwd / "src" / f"{version}-{side}-temp.jar"
+        shutil.copy(inpath, outpath)
+    else:
+        get_mappings(version, side)
+        convert_mappings(version, side)
+        remap(version, side)
 
     decompile(decompiler, decompiled_version, version, side, force)
 

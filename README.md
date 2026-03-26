@@ -1,7 +1,7 @@
-Archiving of the tool is in effect since Mojang released unobfuscated jar of both Minecraft client and server of Java edition.
-Thanks for using this script, it still works for older version if you need it.
-https://www.minecraft.net/en-us/article/removing-obfuscation-in-java-edition
-
+> [!WARNING]
+> [Since Minecraft 26.1](https://www.minecraft.net/en-us/article/removing-obfuscation-in-java-edition), this tool is no longer required and is not recommended for use in new modding projects.
+>
+> For convenience of developers still using this project in their workflow, this tool has been updated to skip the unneeded decompiling/deobfuscating steps extract the contents of Minecraft 26.1+ .jar files directly.
 
 # DecompilerMC
 
