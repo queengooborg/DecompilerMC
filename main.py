@@ -23,7 +23,7 @@ from urllib.error import HTTPError, URLError
 
 if sys.version_info < (3, 7): raise OSError("Python version must be 3.7 or above.")
 
-SPECIAL_SOURCE_VERSION = "1.11.4"
+SPECIAL_SOURCE_VERSION = "1.11.6"
 MANIFEST_LOCATION = "https://piston-meta.mojang.com/mc/game/version_manifest_v2.json"
 CLIENT = "client"
 SERVER = "server"
