@@ -1,3 +1,8 @@
+Archiving of the tool is in effect since Mojang released unobfuscated jar of both Minecraft client and server of Java edition.
+Thanks for using this script, it still works for older version if you need it.
+https://www.minecraft.net/en-us/article/removing-obfuscation-in-java-edition
+
+
 # DecompilerMC
 
 This tool automatically decompiles and remaps specific Minecraft versions. (Specifically, it converts Mojang's mappings from their proguard format to the tsrg format. SpecialSource then uses that and remaps the client jar, which is then decompiled either with CFR (code only) or Fernflower (assets and code).)
