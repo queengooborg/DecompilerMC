@@ -1,7 +1,7 @@
 > [!WARNING]
 > [Since Minecraft 26.1](https://www.minecraft.net/en-us/article/removing-obfuscation-in-java-edition), this tool is no longer required and is not recommended for use in new modding projects.
 >
-> For convenience of developers still using this project in their workflow, this tool has been updated to skip the unneeded decompiling/deobfuscating steps extract the contents of Minecraft 26.1+ .jar files directly.
+> For convenience of developers still using this project in their workflow, this tool has been updated to skip the unneeded decompiling/deobfuscating steps and extract the contents of Minecraft 26.1+ .jar files directly.
 
 # DecompilerMC
 
